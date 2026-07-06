@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DEATH COUNTER</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -142,6 +142,124 @@
             font-size: 11px;
             color: #442255;
             letter-spacing: 1px;
+        }
+
+        /* ── MOBILE CONTROLS ── */
+        #mobile-controls {
+            display: none; /* shown only on touch devices via JS */
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 140px;
+            z-index: 500;
+            pointer-events: none;
+            background: linear-gradient(to top, rgba(5,0,12,0.92) 0%, rgba(5,0,12,0) 100%);
+            padding: 0 16px 12px;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+        #mobile-controls.visible { display: flex; pointer-events: all; }
+
+        /* D-PAD */
+        #dpad {
+            display: grid;
+            grid-template-columns: 52px 52px 52px;
+            grid-template-rows: 52px 52px;
+            gap: 4px;
+        }
+        .dpad-btn {
+            background: rgba(40, 0, 60, 0.85);
+            border: 2px solid #660088;
+            border-radius: 6px;
+            color: #cc88ff;
+            font-size: 22px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            transition: background 0.08s, border-color 0.08s;
+            box-shadow: 0 0 10px #66008844, inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+        .dpad-btn:active, .dpad-btn.pressed {
+            background: rgba(120, 0, 180, 0.9);
+            border-color: #cc44ff;
+            box-shadow: 0 0 18px #aa00ff88;
+        }
+        #btn-left  { grid-column: 1; grid-row: 1 / span 2; }
+        #btn-right { grid-column: 3; grid-row: 1 / span 2; }
+        #btn-up    { grid-column: 2; grid-row: 1; }
+        /* empty center cell */
+        #dpad-center { grid-column: 2; grid-row: 2;
+            background: rgba(20,0,30,0.5); border: 1px solid #330044; border-radius: 4px; }
+
+        /* JUMP BUTTON */
+        #btn-jump {
+            width: 88px; height: 88px;
+            border-radius: 50%;
+            background: rgba(180, 10, 10, 0.85);
+            border: 3px solid #ff3333;
+            color: #fff;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            letter-spacing: 1px;
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            box-shadow: 0 0 20px #ff000055, inset 0 2px 0 rgba(255,255,255,0.12);
+            transition: background 0.08s, box-shadow 0.08s;
+            margin-bottom: 14px;
+            gap: 2px;
+        }
+        #btn-jump .jump-icon { font-size: 26px; line-height: 1; }
+        #btn-jump:active, #btn-jump.pressed {
+            background: rgba(255, 30, 30, 0.95);
+            box-shadow: 0 0 35px #ff0000aa;
+        }
+
+        /* HINT button on mobile (replaces top-bar one) */
+        #mobile-hint-btn {
+            position: fixed;
+            top: 48px; right: 10px;
+            z-index: 501;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            background: rgba(26, 0, 48, 0.9);
+            color: #cc88ff;
+            border: 1px solid #8833cc;
+            cursor: pointer;
+            letter-spacing: 1px;
+            display: none;
+        }
+        #mobile-hint-btn.visible { display: block; }
+
+        /* Mobile top bar — compact */
+        @media (max-width: 600px) {
+            #game-screen {
+                grid-template-rows: 36px 1fr 44px;
+            }
+            #top-bar { padding: 0 8px; }
+            .stat-chip { padding: 2px 7px; gap: 4px; }
+            .stat-label { font-size: 9px; letter-spacing: 1px; }
+            .stat-val { font-size: 14px; }
+            .divider { height: 20px; }
+            .controls-hint { display: none; }
+            #hint-btn { display: none; }
+            #led-counter { font-size: 13px; letter-spacing: 2px; }
+            #troll-msg { font-size: 10px; }
+            #bottom-bar { padding: 2px 0; }
+        }
+
+        /* Game screen with mobile controls — canvas area shrinks to leave room */
+        #game-screen.has-mobile-controls {
+            grid-template-rows: 36px 1fr 44px;
+        }
+        #game-screen.has-mobile-controls #canvas-wrap {
+            margin-bottom: 140px; /* space for floating controls */
         }
 
         /* CANVAS AREA */
@@ -409,6 +527,21 @@
     </div>
 
 </div>
+
+<!-- MOBILE CONTROLS (shown only on touch devices) -->
+<div id="mobile-controls">
+    <div id="dpad">
+        <button class="dpad-btn" id="btn-left">◀</button>
+        <button class="dpad-btn" id="btn-up">▲</button>
+        <button class="dpad-btn" id="btn-right">▶</button>
+        <div id="dpad-center"></div>
+    </div>
+    <button id="btn-jump">
+        <span class="jump-icon">↑</span>
+        <span>JUMP</span>
+    </button>
+</div>
+<button id="mobile-hint-btn" onclick="showHint()">💡 HINT</button>
 
 <!-- HINT OVERLAY -->
 <div id="hint-overlay" onclick="if(event.target===this)closeHint()">
@@ -768,8 +901,57 @@ function drawKnight(ctx, x, y, facing) {
 // ─────────────────────────────────────────────
 let deaths = 0, attempt = 1;
 let keys = {};
-window.addEventListener("keydown", e => { keys[e.code] = true; e.preventDefault(); });
-window.addEventListener("keyup",   e => { keys[e.code] = false; });
+window.addEventListener("keydown", e => {
+    keys[e.code] = true;
+    // Only prevent default for game keys to keep browser shortcuts working
+    if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault();
+});
+window.addEventListener("keyup", e => { keys[e.code] = false; });
+
+// ── TOUCH / MOBILE INPUT ─────────────────────
+const touchKeys = { left: false, right: false, jump: false };
+let isTouchDevice = false;
+
+function detectTouch() {
+    if(isTouchDevice) return;
+    isTouchDevice = true;
+    document.getElementById("mobile-controls").classList.add("visible");
+    document.getElementById("mobile-hint-btn").classList.add("visible");
+    document.getElementById("game-screen").classList.add("has-mobile-controls");
+}
+
+function bindTouchBtn(id, key) {
+    const el = document.getElementById(id);
+    if(!el) return;
+    const press = (e) => {
+        e.preventDefault();
+        touchKeys[key] = true;
+        el.classList.add("pressed");
+        detectTouch();
+    };
+    const release = (e) => {
+        e.preventDefault();
+        touchKeys[key] = false;
+        el.classList.remove("pressed");
+    };
+    el.addEventListener("touchstart",  press,   { passive: false });
+    el.addEventListener("touchend",    release, { passive: false });
+    el.addEventListener("touchcancel", release, { passive: false });
+    // Also support mouse for PC testing
+    el.addEventListener("mousedown", press);
+    el.addEventListener("mouseup",   release);
+    el.addEventListener("mouseleave",release);
+}
+
+window.addEventListener("touchstart", detectTouch, { once: true });
+
+// Will be called after DOM ready
+function initTouchControls() {
+    bindTouchBtn("btn-left",  "left");
+    bindTouchBtn("btn-right", "right");
+    bindTouchBtn("btn-up",    "jump");
+    bindTouchBtn("btn-jump",  "jump");
+}
 
 const GRAVITY = 0.55, JUMP = -13, SPEED = 4.2;
 let sawAngle = 0;
@@ -1032,9 +1214,9 @@ function update() {
     }
 
     // ── Input ──────────────────────────────
-    let left  = keys["ArrowLeft"]  || keys["KeyA"];
-    let right = keys["ArrowRight"] || keys["KeyD"];
-    let jump  = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
+    let left  = keys["ArrowLeft"]  || keys["KeyA"] || touchKeys.left;
+    let right = keys["ArrowRight"] || keys["KeyD"] || touchKeys.right;
+    let jump  = keys["Space"] || keys["ArrowUp"] || keys["KeyW"] || touchKeys.jump;
 
     // Tick the inversion state machine
     tickInvertState();
@@ -1812,13 +1994,13 @@ function playStartAnimation(onComplete) {
 // ─────────────────────────────────────────────
 //  CANVAS RESIZE — fills available space
 // ─────────────────────────────────────────────
-// Logical game resolution (aspect ratio locked)
 const GAME_W = 960, GAME_H = 480;
 
 function resizeCanvas() {
     const wrap = document.getElementById("canvas-wrap");
     if(!wrap) return;
     const aw = wrap.clientWidth;
+    // On mobile, canvas-wrap has margin-bottom for controls — use offsetHeight
     const ah = wrap.clientHeight;
     const scale = Math.min(aw / GAME_W, ah / GAME_H);
     const cw = Math.floor(GAME_W * scale);
@@ -1828,9 +2010,14 @@ function resizeCanvas() {
     gc.height = GAME_H;
     gc.style.width  = cw + "px";
     gc.style.height = ch + "px";
-    gc.style.boxShadow = "0 0 40px #ff000055, 0 0 80px #330011aa";
+    gc.style.boxShadow = "0 0 30px #ff000044, 0 0 60px #330011aa";
+    // Resize end-canvas if visible
+    const ec = document.getElementById("end-canvas");
+    if(ec) { ec.width = window.innerWidth; ec.height = window.innerHeight; }
 }
 window.addEventListener("resize", resizeCanvas);
+// Also handle orientation change on mobile
+window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 200));
 
 // ─────────────────────────────────────────────
 //  START / INIT
@@ -1839,6 +2026,7 @@ function startGame() {
     document.getElementById("title-screen").style.display = "none";
     document.getElementById("game-screen").classList.add("active");
     resizeCanvas();
+    initTouchControls();
     loadLevel(0);
     resetPlayer();
     update();
