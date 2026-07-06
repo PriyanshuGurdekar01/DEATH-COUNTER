@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEATH COUNTER</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background: #05000a;
+            font-family: 'Courier New', monospace;
+            image-rendering: pixelated;
+        }
+
+        /* ── TITLE SCREEN ── */
+        #title-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(ellipse at 50% 40%, #1a0030 0%, #06000f 70%);
+        }
+        #title-text {
+            font-size: clamp(36px, 6vw, 72px);
+            color: #ff1111;
+            letter-spacing: 8px;
+            text-shadow: 0 0 10px #ff0000, 0 0 30px #aa0000, 4px 4px 0 #440000;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        #title-sub {
+            font-size: clamp(12px, 1.4vw, 18px);
+            color: #8844aa;
+            letter-spacing: 4px;
+            margin-bottom: 20px;
+        }
+        #titleCanvas {
+            image-rendering: pixelated;
+            border: 3px solid #3a0020;
+            box-shadow: 0 0 40px #ff000055, 0 0 80px #330011aa;
+            max-width: 90vw;
+        }
+        #title-btn {
+            margin-top: 28px;
+            padding: 14px 48px;
+            font-size: clamp(16px, 2vw, 24px);
+            font-family: 'Courier New', monospace;
+            background: #220010;
+            color: #ff3333;
+            border: 3px solid #ff3333;
+            cursor: pointer;
+            letter-spacing: 3px;
+            text-shadow: 0 0 8px #ff0000;
+            animation: pulse-btn 1s ease-in-out infinite alternate;
+        }
+        @keyframes pulse-btn {
+            from { box-shadow: 0 0 10px #ff000044; }
+            to   { box-shadow: 0 0 30px #ff0000aa; }
+        }
+
+        /* ── GAME SCREEN — full viewport grid ── */
+        #game-screen {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            grid-template-rows: 44px 1fr 52px;
+            grid-template-columns: 1fr;
+            grid-template-areas:
+                "topbar"
+                "canvas"
+                "bottombar";
+            background: #03000a;
+        }
+        #game-screen.active { display: grid; }
+
+        /* TOP BAR */
+        #top-bar {
+            grid-area: topbar;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 18px;
+            background: #0d0016;
+            border-bottom: 2px solid #3a0020;
+            box-shadow: 0 2px 16px #ff000033;
+        }
+        .top-block {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+        .stat-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #11000d;
+            border: 1px solid #3a001a;
+            padding: 3px 12px;
+            border-radius: 2px;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #550033;
+            letter-spacing: 2px;
+        }
+        .stat-val {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        #stat-deaths .stat-val { color: #ff3333; text-shadow: 0 0 8px #ff0000; }
+        #stat-level  .stat-val { color: #cc88ff; text-shadow: 0 0 8px #9933ff; }
+        #stat-attempt .stat-val { color: #ff6622; text-shadow: 0 0 6px #ff4400;
+            animation: blink-led 1.4s step-end infinite; }
+        @keyframes blink-led {
+            0%,100% { opacity: 1; } 55% { opacity: 0.55; }
+        }
+
+        .divider { width: 1px; height: 28px; background: #3a0020; }
+
+        #hint-btn {
+            padding: 5px 16px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            background: #1a0030;
+            color: #cc88ff;
+            border: 2px solid #8833cc;
+            cursor: pointer;
+            letter-spacing: 2px;
+            text-shadow: 0 0 6px #aa44ff;
+            box-shadow: 0 0 10px #8800cc44;
+            transition: box-shadow 0.2s;
+        }
+        #hint-btn:hover { box-shadow: 0 0 18px #cc44ffaa; color: #fff; }
+
+        .controls-hint {
+            font-size: 11px;
+            color: #442255;
+            letter-spacing: 1px;
+        }
+
+        /* CANVAS AREA */
+        #canvas-wrap {
+            grid-area: canvas;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #03000a;
+        }
+        #gameCanvas {
+            image-rendering: pixelated;
+            display: block;
+            /* size set by JS to fill available space */
+        }
+
+        /* BOTTOM BAR */
+        #bottom-bar {
+            grid-area: bottombar;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            background: #0a0010;
+            border-top: 2px solid #3a0020;
+            box-shadow: 0 -2px 16px #ff000033;
+            padding: 4px 0 2px;
+            gap: 2px;
+        }
+        #led-counter {
+            font-size: clamp(16px, 2vw, 26px);
+            color: #ff2200;
+            letter-spacing: 4px;
+            text-shadow: 0 0 6px #ff4400, 0 0 14px #ff0000;
+            animation: blink-led 1.2s step-end infinite;
+        }
+        #troll-msg {
+            font-size: clamp(11px, 1.1vw, 14px);
+            color: #ffcc00;
+            letter-spacing: 1px;
+            text-shadow: 0 0 6px #ff8800;
+            min-height: 16px;
+        }
+
+        /* ── HINT OVERLAY ── */
+        #hint-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5,0,15,0.85);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+        #hint-overlay.show { display: flex; }
+        #hint-box {
+            background: #0d0018;
+            border: 3px solid #8833cc;
+            box-shadow: 0 0 40px #aa00ff88, 0 0 80px #550088aa;
+            padding: 32px 40px;
+            max-width: 520px;
+            width: 90vw;
+            text-align: center;
+        }
+        #hint-box::before {
+            content: "📜 OFFICIAL HINT";
+            display: block;
+            font-size: 11px;
+            letter-spacing: 4px;
+            color: #8833cc;
+            margin-bottom: 14px;
+        }
+        #hint-level-tag { font-size: 11px; color: #554466; letter-spacing: 3px; margin-bottom: 10px; }
+        #hint-text {
+            font-size: clamp(14px, 1.5vw, 18px);
+            color: #e8c8ff;
+            line-height: 1.6;
+            text-shadow: 0 0 8px #aa44ff;
+            margin-bottom: 20px;
+            min-height: 60px;
+        }
+        #hint-fine-print { font-size: 10px; color: #443355; margin-bottom: 18px; font-style: italic; }
+        #hint-close-btn {
+            padding: 8px 28px; font-size: 14px; font-family: 'Courier New', monospace;
+            background: #220033; color: #cc88ff; border: 2px solid #8833cc; cursor: pointer; letter-spacing: 2px;
+        }
+        #hint-close-btn:hover { background: #330044; color: #fff; }
+        #hint-next-btn {
+            padding: 8px 20px; font-size: 13px; font-family: 'Courier New', monospace;
+            background: #100018; color: #664488; border: 2px solid #441166;
+            cursor: pointer; letter-spacing: 1px; margin-left: 10px;
+        }
+        #hint-next-btn:hover { color: #aa66cc; }
+
+        /* ── TRANSITION OVERLAY ── */
+        #transition-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1000; pointer-events: none;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            opacity: 0;
+        }
+        #trans-bg { position: absolute; top:0; left:0; width:100%; height:100%; background:#000; }
+        #trans-scanlines {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: repeating-linear-gradient(
+                to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 3px,
+                rgba(0,0,0,0.55) 3px, rgba(0,0,0,0.55) 4px
+            );
+        }
+        #trans-label {
+            position: relative; z-index: 2;
+            font-size: 13px; color: #550033;
+            letter-spacing: 6px; margin-bottom: 10px;
+        }
+        #trans-title {
+            position: relative; z-index: 2;
+            font-size: clamp(48px, 8vw, 88px); font-weight: bold;
+            color: #ff1111; letter-spacing: 10px;
+            text-shadow: 0 0 20px #ff0000, 0 0 50px #aa0000, 6px 6px 0 #330000;
+            transform: scaleX(0);
+        }
+        #trans-sub {
+            position: relative; z-index: 2;
+            font-size: 14px; color: #884422;
+            letter-spacing: 4px; margin-top: 12px; opacity: 0;
+        }
+        #trans-line-top, #trans-line-bot {
+            position: absolute; left: 0; width: 100%; height: 3px;
+            background: #ff2200; box-shadow: 0 0 10px #ff4400; z-index: 3;
+        }
+        #trans-line-top { top: 50%; transform: translateY(-44px); }
+        #trans-line-bot { top: 50%; transform: translateY(44px); }
+
+        /* ── END SCREEN ── */
+        #end-screen {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1100;
+            background: radial-gradient(ellipse at 50% 40%, #1a0030 0%, #04000a 70%);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+        }
+        #end-screen.show { display: flex; }
+
+        #end-crown { font-size: clamp(48px, 8vw, 88px); margin-bottom: 8px;
+            animation: float-crown 2s ease-in-out infinite alternate; }
+        @keyframes float-crown {
+            from { transform: translateY(0px); }
+            to   { transform: translateY(-12px); }
+        }
+        #end-title {
+            font-size: clamp(26px, 5vw, 60px);
+            font-weight: bold; color: #ffdd00;
+            letter-spacing: 6px;
+            text-shadow: 0 0 20px #ffaa00, 0 0 50px #ff6600, 4px 4px 0 #440000;
+            margin-bottom: 6px;
+            animation: shimmer 1.5s ease-in-out infinite alternate;
+        }
+        @keyframes shimmer {
+            from { text-shadow: 0 0 20px #ffaa00, 0 0 50px #ff6600, 4px 4px 0 #440000; }
+            to   { text-shadow: 0 0 30px #ffffff, 0 0 60px #ffcc00, 4px 4px 0 #440000; }
+        }
+        #end-subtitle {
+            font-size: clamp(11px, 1.4vw, 16px); color: #cc88ff;
+            letter-spacing: 4px; margin-bottom: 28px;
+        }
+        #end-stats-box {
+            background: #0d0018; border: 2px solid #4400aa;
+            box-shadow: 0 0 30px #6600cc55;
+            padding: 18px 40px; margin-bottom: 24px; min-width: 300px;
+        }
+        .end-stat-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 0; border-bottom: 1px solid #220033;
+            font-size: clamp(12px, 1.3vw, 15px);
+        }
+        .end-stat-row:last-child { border-bottom: none; }
+        .end-stat-label { color: #664488; letter-spacing: 2px; }
+        .end-stat-val { color: #ff3333; font-weight: bold; text-shadow: 0 0 8px #ff0000; letter-spacing: 2px; }
+        .end-stat-val.gold { color: #ffcc00; text-shadow: 0 0 8px #ffaa00; }
+        #end-msg {
+            font-size: clamp(11px, 1.2vw, 14px); color: #ffcc00;
+            letter-spacing: 1px; max-width: 580px; line-height: 1.8;
+            margin-bottom: 24px; text-shadow: 0 0 6px #ff8800;
+        }
+        #end-fine-print {
+            font-size: 10px; color: #331133; letter-spacing: 2px;
+            margin-bottom: 22px; font-style: italic;
+        }
+        .end-btn {
+            padding: 12px 36px; font-size: clamp(13px, 1.4vw, 17px);
+            font-family: 'Courier New', monospace;
+            cursor: pointer; letter-spacing: 3px; margin: 0 8px;
+        }
+        #end-replay-btn {
+            background: #220010; color: #ff3333; border: 3px solid #ff3333;
+            text-shadow: 0 0 8px #ff0000;
+            animation: pulse-btn 1s ease-in-out infinite alternate;
+        }
+        #end-title-btn {
+            background: #0d0018; color: #664488; border: 2px solid #441166;
+        }
+        #end-title-btn:hover { color: #cc88ff; border-color: #8833cc; }
+        #end-canvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; pointer-events: none; z-index: -1;
+        }
+    </style>
+</head>
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen">
+    <div id="title-text">⚔ DEATH COUNTER ⚔</div>
+    <div id="title-sub">A RAGEBAIT PLATFORMER</div>
+    <canvas id="titleCanvas" width="800" height="300"></canvas>
+    <button id="title-btn" onclick="startGame()">▶ START (IF YOU DARE)</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen">
+
+    <!-- TOP BAR -->
+    <div id="top-bar">
+        <div class="top-block">
+            <div class="stat-chip" id="stat-deaths">
+                <span class="stat-label">☠ DEATHS</span>
+                <span class="stat-val"><span id="deaths">0</span></span>
+            </div>
+            <div class="divider"></div>
+            <div class="stat-chip" id="stat-level">
+                <span class="stat-label">LEVEL</span>
+                <span class="stat-val"><span id="level-num">1</span></span>
+            </div>
+            <div class="divider"></div>
+            <div class="stat-chip" id="stat-attempt">
+                <span class="stat-label">ATTEMPT</span>
+                <span class="stat-val">#<span id="led-attempt">1</span></span>
+            </div>
+        </div>
+
+        <button id="hint-btn" onclick="showHint()">💡 HINT</button>
+
+        <div class="controls-hint">
+            WASD / ← → = MOVE &nbsp;|&nbsp; SPACE / W / ↑ = JUMP
+        </div>
+    </div>
+
+    <!-- CANVAS AREA -->
+    <div id="canvas-wrap">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div id="bottom-bar">
+        <div id="led-counter">DEATHS: <span id="led-deaths">0</span> &nbsp;|&nbsp; ATTEMPT #<span id="led-attempt2">1</span></div>
+        <div id="troll-msg">Welcome. Looks easy, doesn't it?</div>
+    </div>
+
+</div>
+
+<!-- HINT OVERLAY -->
+<div id="hint-overlay" onclick="if(event.target===this)closeHint()">
+    <div id="hint-box">
+        <div id="hint-level-tag">LEVEL <span id="hint-lvl-num">1</span> — HINT <span id="hint-num">1</span>/<span id="hint-total">4</span></div>
+        <div id="hint-text">...</div>
+        <div id="hint-fine-print">* This hint is 100% accurate. Probably.</div>
+        <div>
+            <button id="hint-close-btn" onclick="closeHint()">✕ CLOSE</button>
+            <button id="hint-next-btn" onclick="nextHint()">▶ NEXT HINT</button>
+        </div>
+    </div>
+</div>
+
+<!-- END SCREEN -->
+<div id="end-screen">
+    <canvas id="end-canvas"></canvas>
+    <div id="end-crown">👑</div>
+    <div id="end-title">YOU ACTUALLY WON?!</div>
+    <div id="end-subtitle">— SERIOUSLY. ALL THREE LEVELS. WE'RE IMPRESSED. BARELY. —</div>
+    <div id="end-stats-box">
+        <div class="end-stat-row">
+            <span class="end-stat-label">☠ TOTAL DEATHS</span>
+            <span class="end-stat-val" id="end-stat-deaths">0</span>
+        </div>
+        <div class="end-stat-row">
+            <span class="end-stat-label">🔄 TOTAL ATTEMPTS</span>
+            <span class="end-stat-val" id="end-stat-attempts">0</span>
+        </div>
+        <div class="end-stat-row">
+            <span class="end-stat-label">🏆 LEVELS CLEARED</span>
+            <span class="end-stat-val gold">3 / 3</span>
+        </div>
+        <div class="end-stat-row">
+            <span class="end-stat-label">🧠 SKILL RATING</span>
+            <span class="end-stat-val gold" id="end-rating">—</span>
+        </div>
+    </div>
+    <div id="end-msg">
+        Thank you for playing DEATH COUNTER.<br>
+        We designed this game to be unbeatable.<br>
+        We were wrong. Please never speak of this again.
+    </div>
+    <div id="end-fine-print">* No knights were harmed. Several keyboards were.</div>
+    <div>
+        <button class="end-btn" id="end-replay-btn" onclick="replayGame()">↺ PLAY AGAIN (WHY)</button>
+        <button class="end-btn" id="end-title-btn" onclick="goToTitle()">⌂ MAIN MENU</button>
+    </div>
+</div>
+
+<!-- TRANSITION OVERLAY -->
+<div id="transition-overlay">
+    <div id="trans-bg"></div>
+    <div id="trans-scanlines"></div>
+    <div id="trans-line-top"></div>
+    <div id="trans-line-bot"></div>
+    <div id="trans-label">— NOW ENTERING —</div>
+    <div id="trans-title">LEVEL 1</div>
+    <div id="trans-sub">Good luck. You'll need it.</div>
+</div>
+
+<script>
+
+// ─────────────────────────────────────────────
+//  TITLE SCREEN PIXEL ART PAINTER
+// ─────────────────────────────────────────────
+function drawTitleScreen() {
+    const tc = document.getElementById("titleCanvas");
+    const tx = tc.getContext("2d");
+    const W = 800, H = 340;
+
+    // Sky gradient — dark castle
+    let bg = tx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#0d0018");
+    bg.addColorStop(0.6, "#1a0030");
+    bg.addColorStop(1, "#330008");
+    tx.fillStyle = bg;
+    tx.fillRect(0, 0, W, H);
+
+    // Dithered fog bands
+    tx.fillStyle = "rgba(100,0,60,0.18)";
+    for(let y=0;y<H;y+=4){tx.fillRect(0,y,W,2);}
+
+    // Castle wall bricks background
+    drawBrickWall(tx, 0, 80, W, H-80, "#1a0025", "#220030");
+
+    // Torch glows on walls
+    drawTorchGlow(tx, 120, 130);
+    drawTorchGlow(tx, 670, 130);
+
+    // DEATH COUNTER STONE PILLAR (center)
+    drawStonePillar(tx, 310, 60, 180, 220);
+
+    // LED display on pillar
+    tx.fillStyle = "#1a0000";
+    tx.fillRect(330, 110, 140, 60);
+    tx.strokeStyle = "#550000";
+    tx.lineWidth = 2;
+    tx.strokeRect(330, 110, 140, 60);
+    tx.font = "bold 22px 'Courier New'";
+    tx.fillStyle = "#ff2200";
+    tx.shadowColor = "#ff4400";
+    tx.shadowBlur = 12;
+    tx.fillText("DEATHS: 184", 338, 138);
+    tx.font = "14px 'Courier New'";
+    tx.fillStyle = "#ff6633";
+    tx.fillText("Attempt #185", 352, 158);
+    tx.shadowBlur = 0;
+
+    // Lava pit
+    drawLavaPit(tx, 0, 270, W, 70);
+
+    // Jagged floor spikes
+    drawSpikes(tx, 0, 270, W, "#cc0000", "#ff4400");
+
+    // Saw blades on walls
+    drawRotatingSawBlade(tx, 60, 200, 36, 0);
+    drawRotatingSawBlade(tx, 720, 200, 36, 1);
+    drawRotatingSawBlade(tx, 380, 50, 28, 0.5);
+
+    // Spiked ceiling crushing down
+    drawSpikeCeiling(tx, 0, 0, W, 30);
+
+    // Invisible block hint
+    tx.fillStyle = "rgba(255,255,255,0.06)";
+    tx.fillRect(430, 190, 50, 22);
+    tx.strokeStyle = "rgba(255,255,255,0.15)";
+    tx.lineWidth = 1;
+    tx.strokeRect(430, 190, 50, 22);
+
+    // Knight hero
+    drawKnight(tx, 185, 222, 1);
+
+    // "?" troll block floating
+    drawTrollBlock(tx, 440, 185);
+
+    // Pixel art style scanline overlay
+    for(let y=0;y<H;y+=2){
+        tx.fillStyle = "rgba(0,0,0,0.18)";
+        tx.fillRect(0,y,W,1);
+    }
+}
+
+// ─── PIXEL ART HELPERS ───────────────────────
+function drawBrickWall(ctx, x, y, w, h, c1, c2) {
+    const bw = 40, bh = 16;
+    for(let row=0; row*bh < h; row++) {
+        let offset = (row%2===0) ? 0 : bw/2;
+        for(let col=-1; col*bw < w+bw; col++) {
+            let bx = x + col*bw + offset, by = y + row*bh;
+            ctx.fillStyle = (row+col)%3===0 ? c2 : c1;
+            ctx.fillRect(bx, by, bw-2, bh-2);
+            // Dither shading
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.fillRect(bx+bw-6, by, 4, bh-2);
+            ctx.fillRect(bx, by+bh-5, bw-2, 3);
+        }
+    }
+}
+
+function drawStonePillar(ctx, x, y, w, h) {
+    // Main stone body
+    let grad = ctx.createLinearGradient(x, y, x+w, y);
+    grad.addColorStop(0, "#2a1035");
+    grad.addColorStop(0.5, "#3d1a50");
+    grad.addColorStop(1, "#1e0828");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h);
+    // Brick pattern on pillar
+    ctx.strokeStyle = "#1a0025";
+    ctx.lineWidth = 1;
+    for(let row=0; row<h; row+=20) {
+        ctx.beginPath(); ctx.moveTo(x, y+row); ctx.lineTo(x+w, y+row); ctx.stroke();
+    }
+    for(let col=0; col<w; col+=30) {
+        ctx.beginPath(); ctx.moveTo(x+col, y); ctx.lineTo(x+col, y+h); ctx.stroke();
+    }
+    // Edge highlights
+    ctx.fillStyle = "#5a2080";
+    ctx.fillRect(x, y, 4, h);
+    ctx.fillRect(x+w-4, y, 4, h);
+    ctx.fillRect(x, y, w, 4);
+}
+
+function drawLavaPit(ctx, x, y, w, h) {
+    // Base lava
+    let lgrad = ctx.createLinearGradient(x, y, x, y+h);
+    lgrad.addColorStop(0, "#ff4400");
+    lgrad.addColorStop(0.4, "#cc1100");
+    lgrad.addColorStop(1, "#550000");
+    ctx.fillStyle = lgrad;
+    ctx.fillRect(x, y, w, h);
+    // Lava bubbles
+    ctx.fillStyle = "#ff6600";
+    for(let i=0; i<w; i+=28) {
+        ctx.beginPath();
+        ctx.arc(x+i+14, y+10, 6, 0, Math.PI*2);
+        ctx.fill();
+    }
+    ctx.fillStyle = "#ffaa00";
+    for(let i=0; i<w; i+=48) {
+        ctx.beginPath();
+        ctx.arc(x+i+24, y+18, 3, 0, Math.PI*2);
+        ctx.fill();
+    }
+}
+
+function drawSpikes(ctx, x, y, w, base, c1, c2) {
+    ctx.fillStyle = c1 || "#bb0000";
+    for(let i=x; i<x+w; i+=20) {
+        ctx.beginPath();
+        ctx.moveTo(i, y);
+        ctx.lineTo(i+10, y-22);
+        ctx.lineTo(i+20, y);
+        ctx.fill();
+        // highlight edge
+        ctx.fillStyle = c2 || "#ff4400";
+        ctx.beginPath();
+        ctx.moveTo(i+9, y-4);
+        ctx.lineTo(i+10, y-22);
+        ctx.lineTo(i+11, y-4);
+        ctx.fill();
+        ctx.fillStyle = c1 || "#bb0000";
+    }
+}
+
+function drawSpikeCeiling(ctx, x, y, w, h) {
+    ctx.fillStyle = "#1a0025";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "#440055";
+    for(let i=x; i<x+w; i+=18) {
+        ctx.beginPath();
+        ctx.moveTo(i, y+h);
+        ctx.lineTo(i+9, y+h+18);
+        ctx.lineTo(i+18, y+h);
+        ctx.fill();
+    }
+    ctx.fillStyle = "#8800aa";
+    for(let i=x; i<x+w; i+=18) {
+        ctx.beginPath();
+        ctx.moveTo(i+8, y+h+2);
+        ctx.lineTo(i+9, y+h+18);
+        ctx.lineTo(i+10, y+h+2);
+        ctx.fill();
+    }
+}
+
+function drawRotatingSawBlade(ctx, cx, cy, r, phase) {
+    let teeth = 10;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(phase * Math.PI * 2);
+    // Inner disc
+    ctx.beginPath();
+    ctx.arc(0, 0, r*0.45, 0, Math.PI*2);
+    ctx.fillStyle = "#666";
+    ctx.fill();
+    ctx.strokeStyle = "#999";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Teeth
+    for(let i=0; i<teeth; i++) {
+        let a = (i/teeth)*Math.PI*2;
+        let a2 = ((i+0.5)/teeth)*Math.PI*2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a)*r*0.45, Math.sin(a)*r*0.45);
+        ctx.lineTo(Math.cos(a2)*r, Math.sin(a2)*r);
+        ctx.lineTo(Math.cos(a+(1/teeth)*Math.PI*2)*r*0.45, Math.sin(a+(1/teeth)*Math.PI*2)*r*0.45);
+        ctx.fillStyle = "#aaa";
+        ctx.fill();
+        ctx.strokeStyle = "#ccc";
+        ctx.lineWidth=1;
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function drawTorchGlow(ctx, x, y) {
+    let g = ctx.createRadialGradient(x, y, 2, x, y, 60);
+    g.addColorStop(0, "rgba(255,150,0,0.5)");
+    g.addColorStop(1, "rgba(255,50,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x-60, y-60, 120, 120);
+    // Torch body
+    ctx.fillStyle = "#884400";
+    ctx.fillRect(x-3, y, 6, 20);
+    ctx.fillStyle = "#ffaa00";
+    ctx.fillRect(x-5, y-8, 10, 12);
+    ctx.fillStyle = "#ffff00";
+    ctx.fillRect(x-2, y-10, 4, 6);
+}
+
+function drawTrollBlock(ctx, x, y) {
+    ctx.fillStyle = "#5500aa";
+    ctx.fillRect(x, y, 50, 22);
+    ctx.strokeStyle = "#8822ff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 50, 22);
+    ctx.font = "bold 16px 'Courier New'";
+    ctx.fillStyle = "#ffcc00";
+    ctx.shadowColor = "#ff8800";
+    ctx.shadowBlur = 6;
+    ctx.fillText("?", x+20, y+16);
+    ctx.shadowBlur = 0;
+}
+
+// ─── KNIGHT PIXEL ART ────────────────────────
+function drawKnight(ctx, x, y, facing) {
+    // facing: 1 = right, -1 = left
+    ctx.save();
+    if(facing < 0) { ctx.translate(x+20, y); ctx.scale(-1,1); ctx.translate(-20, -y); }
+    const P = (px,py,w,h,c) => { ctx.fillStyle=c; ctx.fillRect(x+px,y+py,w,h); };
+    // Shadow
+    ctx.fillStyle="rgba(0,0,0,0.4)";
+    ctx.fillRect(x+2,y+40,36,6);
+    // Boots
+    P(4,33,10,8,"#333"); P(18,33,10,8,"#333");
+    P(3,38,12,4,"#222"); P(17,38,12,4,"#222");
+    // Legs armor
+    P(6,24,10,12,"#888"); P(18,24,10,12,"#888");
+    P(7,25,8,10,"#aaa"); P(19,25,8,10,"#aaa");
+    // Body armor
+    P(4,12,26,14,"#999"); P(5,13,24,12,"#bbb");
+    // Chest detail
+    P(8,15,18,8,"#aaa"); P(10,16,14,6,"#ccc");
+    // Cross on chest
+    P(15,15,4,10,"#777"); P(11,19,12,3,"#777");
+    // Arms
+    P(0,14,6,12,"#888"); P(28,14,6,12,"#888");
+    P(1,15,4,10,"#aaa"); P(29,15,4,10,"#aaa");
+    // Gauntlets
+    P(-2,22,8,6,"#777"); P(28,22,8,6,"#777");
+    // Sword (right hand)
+    P(36,10,4,24,"#ccc"); P(36,14,4,4,"#888"); P(34,14,8,3,"#999");
+    P(37,8,2,8,"#ddd");
+    // Neck
+    P(12,8,10,6,"#c8a080");
+    // Helmet
+    P(6,0,22,10,"#888"); P(7,1,20,8,"#aaa");
+    // Visor
+    P(8,3,18,5,"#334455"); P(9,4,16,3,"#445566");
+    // Visor glow slit
+    P(10,4,14,2,"#00eeff");
+    // HORNS
+    P(6,-8,4,10,"#cc9900"); P(22,-8,4,10,"#cc9900");
+    P(5,-12,4,6,"#ffcc00"); P(23,-12,4,6,"#ffcc00");
+    P(6,-16,3,5,"#ffee00"); P(23,-16,3,5,"#ffee00");
+    // Horn tips
+    P(7,-19,2,4,"#fff8aa"); P(24,-19,2,4,"#fff8aa");
+    // Plume
+    P(15,-6,4,8,"#cc0000"); P(16,-10,2,6,"#ff2200"); P(17,-12,2,4,"#ff6600");
+    ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+//  GAME STATE
+// ─────────────────────────────────────────────
+let deaths = 0, attempt = 1;
+let keys = {};
+window.addEventListener("keydown", e => { keys[e.code] = true; e.preventDefault(); });
+window.addEventListener("keyup",   e => { keys[e.code] = false; });
+
+const GRAVITY = 0.55, JUMP = -13, SPEED = 4.2;
+let sawAngle = 0;
+
+// ── Controls inversion system ─────────────
+// invertState.active  = controls are currently inverted
+// invertState.timer   = frames remaining while active
+// invertState.nextFlip= frames until next inversion triggers
+// invertState.warnTimer = frames of "about to flip" warning shown
+const invertState = {
+    active: false,
+    timer: 0,
+    nextFlip: 0,
+    warnTimer: 0
+};
+
+// Per-level inversion config: [minInterval, maxInterval, duration] in frames (60fps)
+const INVERT_CONFIG = [
+    [400, 700, 180],   // Level 1: rare (~7–12s), lasts 3s
+    [220, 420, 240],   // Level 2: moderate (~4–7s), lasts 4s
+    [120, 260, 300],   // Level 3: frequent (~2–4s), lasts 5s
+];
+
+function resetInvertState() {
+    const cfg = INVERT_CONFIG[Math.min(currentLevel, INVERT_CONFIG.length-1)];
+    invertState.active    = false;
+    invertState.timer     = 0;
+    invertState.warnTimer = 0;
+    // First inversion: 3–6s after level loads so player gets comfortable first
+    invertState.nextFlip  = 180 + Math.floor(Math.random() * 180);
+}
+
+function tickInvertState() {
+    const cfg = INVERT_CONFIG[Math.min(currentLevel, INVERT_CONFIG.length-1)];
+    const [minI, maxI, dur] = cfg;
+
+    if(invertState.active) {
+        invertState.timer--;
+        // Show 2-second warning before snapping back
+        if(invertState.timer === 120) {
+            invertState.warnTimer = 120; // will display "reverting soon"
+        }
+        if(invertState.warnTimer > 0) invertState.warnTimer--;
+
+        if(invertState.timer <= 0) {
+            invertState.active = false;
+            invertState.timer  = 0;
+            // Schedule next inversion
+            invertState.nextFlip = minI + Math.floor(Math.random() * (maxI - minI));
+            document.getElementById("troll-msg").innerText = "Controls back to normal. For now.";
+        }
+    } else {
+        invertState.nextFlip--;
+        if(invertState.nextFlip <= 0) {
+            invertState.active = true;
+            invertState.timer  = dur;
+            invertState.warnTimer = 0;
+            document.getElementById("troll-msg").innerText = "⚠ SURPRISE! Controls just inverted. Good luck.";
+        }
+    }
+}
+
+// ── Player ───────────────────────────────────
+let player = {
+    x: 60, y: 290, vx: 0, vy: 0,
+    w: 34, h: 42, grounded: false, facing: 1,
+    dead: false, deathTimer: 0
+};
+
+function resetPlayer() {
+    player.x=60; player.y=290;
+    player.vx=0; player.vy=0;
+    player.grounded=false; player.dead=false; player.deathTimer=0;
+}
+
+// ── Level Layout ─────────────────────────────
+// Each level has: platforms, traps, saws, goal, trollMsg
+const LEVELS = [
+    {
+        platforms:[
+            {x:0,   y:380, w:180, h:40},  // start floor
+            {x:290, y:300, w:140, h:18},  // mid platform
+            {x:620, y:380, w:180, h:40},  // goal floor
+        ],
+        traps:[
+            {x:355, y:282, w:20, h:20, type:"spike"},
+        ],
+        saws:[],
+        invisBlock: null,
+        ceilCrush: null,
+        goal:{x:730, y:338, w:50, h:42},
+        lava:{x:180, y:390},
+        trollMsg: "Looks pretty simple. Just get across."
+    },
+    {
+        platforms:[
+            {x:0,   y:380, w:160, h:40},
+            {x:250, y:310, w:100, h:18},
+            {x:420, y:240, w:80,  h:18},
+            {x:580, y:310, w:100, h:18},
+            {x:640, y:380, w:160, h:40},
+        ],
+        traps:[
+            {x:270, y:292, w:18, h:20, type:"spike"},
+            {x:430, y:222, w:18, h:20, type:"spike"},
+            {x:600, y:292, w:18, h:20, type:"spike"},
+        ],
+        saws:[
+            {x:340, y:280, r:22, speed:0.03},
+        ],
+        invisBlock:{x:460, y:210, w:50, h:18, visible:false},
+        ceilCrush: null,
+        goal:{x:730, y:338, w:50, h:42},
+        lava:{x:160, y:390},
+        trollMsg: "More platforms. Easier, right?"
+    },
+    {
+        platforms:[
+            {x:0,   y:380, w:120, h:40},
+            {x:200, y:330, w:80,  h:18},
+            {x:360, y:270, w:80,  h:18},
+            {x:520, y:210, w:80,  h:18},
+            {x:640, y:380, w:160, h:40},
+        ],
+        traps:[
+            {x:210, y:312, w:16, h:20, type:"spike"},
+            {x:372, y:252, w:16, h:20, type:"spike"},
+            {x:532, y:192, w:16, h:20, type:"spike"},
+        ],
+        saws:[
+            {x:290, y:310, r:26, speed:0.05},
+            {x:450, y:248, r:26, speed:-0.04},
+        ],
+        invisBlock:{x:545, y:180, w:50, h:18, visible:false},
+        ceilCrush:{x:200, w:440, h:30, y:-30, speed:0.6, maxY:60, dir:1},
+        goal:{x:730, y:338, w:50, h:42},
+        lava:{x:120, y:390},
+        trollMsg: "Almost there... maybe."
+    }
+];
+
+let currentLevel = 0;
+let level = null;
+let sawPhase = [0,0,0];
+let ceilY = -30;
+
+function loadLevel(idx) {
+    // Deep clone level data so we can mutate
+    level = JSON.parse(JSON.stringify(LEVELS[idx]));
+    ceilY = level.ceilCrush ? level.ceilCrush.y : -30;
+    sawPhase = [0,0,0];
+    applyTrolling();
+    // Update HUD level display
+    const el = document.getElementById("level-num");
+    if(el) el.innerText = idx + 1;
+    // Reset inversion system for new level
+    resetInvertState();
+}
+
+// ─── TROLLING MESSAGES TABLE ─────────────────
+const TROLL_MSGS = [
+    "Looks pretty simple. Just get across.",
+    "Oh, you made it? Lucky.",
+    "Hmm. Try again.",
+    "Controls reversed. Good luck!",
+    "Invisble? No, just transparent.",
+    "The ceiling isn't moving. Or is it?",
+    "You have NO idea what's coming.",
+    "Still here? Respect. (Barely.)",
+    "Maybe quit while you're behind.",
+    "YOUR PATHETIC PERSISTENCE IS NOTED.",
+    "ok fine. you're actually good at this.",
+    "NO WAIT COME BACK I WASN'T DONE"
+];
+
+function getTrollMsg() {
+    if(deaths < TROLL_MSGS.length) return TROLL_MSGS[deaths];
+    return `DEATHS: ${deaths}. Touch grass.`;
+}
+
+function applyTrolling() {
+    // Attempt >= 4: invert controls
+    // Attempt >= 2: shift first trap slightly
+    if(attempt >= 2 && level.traps.length > 0) {
+        level.traps[0].x += (attempt % 2 === 0) ? 8 : -8;
+    }
+    // Reveal invis block visually after 2 deaths
+    if(level.invisBlock && deaths >= 2) {
+        level.invisBlock.visible = true;
+    }
+}
+
+function triggerDeath() {
+    if(player.dead) return;
+    player.dead = true;
+    player.deathTimer = 80;
+    deaths++;
+    attempt++;
+    document.getElementById("deaths").innerText = deaths;
+    document.getElementById("led-deaths").innerText = deaths;
+    document.getElementById("led-attempt").innerText = attempt;
+    document.getElementById("led-attempt2").innerText = attempt;
+    document.getElementById("troll-msg").innerText = getTrollMsg();
+}
+
+function triggerWin() {
+    // Freeze player in place during animation
+    player.dead = true;
+    player.deathTimer = 9999;
+
+    const nextLevel = currentLevel + 1;
+
+    // All levels beaten
+    if(nextLevel >= LEVELS.length) {
+        // Short delay then show end screen
+        setTimeout(() => showEndScreen(), 600);
+        return;
+    }
+
+    playTransition(nextLevel, () => {
+        currentLevel = nextLevel;
+        attempt = 1;
+        loadLevel(currentLevel);
+        resetPlayer();
+        document.getElementById("troll-msg").innerText = "NEXT LEVEL. You survived. For now.";
+    });
+}
+
+// ─────────────────────────────────────────────
+//  COLLISION HELPERS
+// ─────────────────────────────────────────────
+function aabb(a, b) {
+    return a.x < b.x+b.w && a.x+a.w > b.x &&
+           a.y < b.y+b.h && a.y+a.h > b.y;
+}
+function circleRect(cx,cy,r, rx,ry,rw,rh) {
+    let nearX = Math.max(rx, Math.min(cx, rx+rw));
+    let nearY = Math.max(ry, Math.min(cy, ry+rh));
+    let dx=cx-nearX, dy=cy-nearY;
+    return dx*dx+dy*dy < r*r;
+}
+
+// ─────────────────────────────────────────────
+//  UPDATE LOOP
+// ─────────────────────────────────────────────
+function update() {
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const W = GAME_W, H = GAME_H;
+
+    if(player.dead) {
+        player.deathTimer--;
+        if(player.deathTimer <= 0) {
+            loadLevel(currentLevel);
+            resetPlayer();
+        }
+        draw(ctx, W, H);
+        requestAnimationFrame(update);
+        return;
+    }
+
+    // ── Input ──────────────────────────────
+    let left  = keys["ArrowLeft"]  || keys["KeyA"];
+    let right = keys["ArrowRight"] || keys["KeyD"];
+    let jump  = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
+
+    // Tick the inversion state machine
+    tickInvertState();
+
+    // Apply inversion if active
+    if(invertState.active) { let t=left; left=right; right=t; }
+
+    if(left)  { player.vx = -SPEED; player.facing = -1; }
+    else if(right) { player.vx = SPEED; player.facing = 1; }
+    else      { player.vx *= 0.7; }
+
+    if(jump && player.grounded) {
+        player.vy = JUMP;
+        player.grounded = false;
+    }
+
+    // ── Physics ────────────────────────────
+    player.vy += GRAVITY;
+    if(player.vy > 18) player.vy = 18;
+    player.x += player.vx;
+    player.y += player.vy;
+    player.grounded = false;
+
+    // ── Platform collision ─────────────────
+    for(let p of level.platforms) {
+        let pr = {x:p.x, y:p.y, w:p.w, h:p.h};
+        if(aabb({x:player.x,y:player.y,w:player.w,h:player.h}, pr)) {
+            let prevBottom = player.y + player.h - player.vy;
+            if(player.vy >= 0 && prevBottom <= p.y+2) {
+                player.y = p.y - player.h;
+                player.vy = 0;
+                player.grounded = true;
+            }
+        }
+    }
+
+    // ── Invisible block ────────────────────
+    if(level.invisBlock) {
+        let ib = level.invisBlock;
+        if(aabb({x:player.x,y:player.y,w:player.w,h:player.h},{x:ib.x,y:ib.y,w:ib.w,h:ib.h})) {
+            if(player.vy < 0) { player.vy = 2; }
+            else if(player.vy >= 0 && player.y + player.h - player.vy <= ib.y+2) {
+                player.y = ib.y - player.h;
+                player.vy = 0;
+                player.grounded = true;
+            }
+        }
+    }
+
+    // ── Crushing ceiling ───────────────────
+    if(level.ceilCrush) {
+        let cc = level.ceilCrush;
+        ceilY += cc.speed * cc.dir;
+        if(ceilY > cc.maxY) cc.dir = -1;
+        if(ceilY < -30) cc.dir = 1;
+        let ceilRect = {x:cc.x, y:ceilY, w:cc.w, h:cc.h};
+        if(aabb({x:player.x,y:player.y,w:player.w,h:player.h}, ceilRect)) {
+            triggerDeath();
+        }
+    }
+
+    // ── Saw blade collisions ───────────────
+    for(let i=0;i<level.saws.length;i++) {
+        let s = level.saws[i];
+        sawPhase[i] = (sawPhase[i]||0) + s.speed;
+        if(circleRect(s.x, s.y, s.r, player.x, player.y, player.w, player.h)) {
+            triggerDeath();
+        }
+    }
+
+    // ── Spike trap collisions ──────────────
+    for(let t of level.traps) {
+        if(aabb({x:player.x,y:player.y,w:player.w,h:player.h},{x:t.x,y:t.y,w:t.w,h:t.h})) {
+            triggerDeath();
+        }
+    }
+
+    // ── Lava / out of bounds ───────────────
+    if(player.y + player.h > H) { triggerDeath(); }
+    if(player.x < -50 || player.x > W+50) { triggerDeath(); }
+
+    // ── Win check ─────────────────────────
+    let g = level.goal;
+    if(aabb({x:player.x,y:player.y,w:player.w,h:player.h},{x:g.x,y:g.y,w:g.w,h:g.h})) {
+        triggerWin();
+    }
+
+    draw(ctx, W, H);
+    requestAnimationFrame(update);
+}
+
+// ─────────────────────────────────────────────
+//  BACKGROUND SYSTEM
+// ─────────────────────────────────────────────
+let bgTick = 0; // incremented each frame for animations
+
+function drawBackground(ctx, W, H) {
+    bgTick++;
+
+    // ── LAYER 0: Deep sky gradient ──────────
+    let sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0,   "#06000f");
+    sky.addColorStop(0.4, "#110020");
+    sky.addColorStop(0.8, "#1e0030");
+    sky.addColorStop(1,   "#2a0010");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    // ── LAYER 1: Distant jagged mountains (silhouette) ──
+    ctx.fillStyle = "#0d001a";
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    const mPeaks = [
+        [0,180],[60,100],[130,155],[200,80],[280,130],
+        [350,60],[420,110],[500,70],[570,120],[640,55],
+        [710,105],[780,75],[800,130],[800,H]
+    ];
+    for(let [px,py] of mPeaks) ctx.lineTo(px, py);
+    ctx.fill();
+
+    // Second mountain layer, slightly lighter, offset
+    ctx.fillStyle = "#150025";
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    const mPeaks2 = [
+        [0,210],[80,160],[150,200],[230,130],[310,175],
+        [390,110],[460,160],[540,100],[610,155],[680,120],
+        [750,160],[800,130],[800,H]
+    ];
+    for(let [px,py] of mPeaks2) ctx.lineTo(px, py);
+    ctx.fill();
+
+    // ── LAYER 2: Full moon ──────────────────
+    let moonGlow = ctx.createRadialGradient(650, 55, 4, 650, 55, 48);
+    moonGlow.addColorStop(0,   "rgba(200,170,255,0.22)");
+    moonGlow.addColorStop(0.5, "rgba(160,100,220,0.10)");
+    moonGlow.addColorStop(1,   "rgba(80,0,120,0)");
+    ctx.fillStyle = moonGlow;
+    ctx.beginPath();
+    ctx.arc(650, 55, 48, 0, Math.PI*2);
+    ctx.fill();
+    // Moon disc
+    ctx.fillStyle = "#c8a8ee";
+    ctx.beginPath();
+    ctx.arc(650, 55, 20, 0, Math.PI*2);
+    ctx.fill();
+    // Moon surface dithered craters
+    ctx.fillStyle = "#a888cc";
+    ctx.beginPath(); ctx.arc(643, 50, 4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(656, 60, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(648, 62, 2, 0, Math.PI*2); ctx.fill();
+
+    // ── LAYER 3: Stars (pixel dots) ────────
+    const starSeeds = [
+        [20,12],[55,28],[100,8],[145,22],[190,14],[240,30],[285,10],
+        [330,25],[375,8],[415,18],[460,5],[510,28],[555,12],[595,22],
+        [430,40],[150,42],[700,30],[740,15],[770,38],[50,45],
+    ];
+    for(let [sx,sy] of starSeeds) {
+        let twinkle = 0.4 + 0.6 * Math.abs(Math.sin((bgTick*0.02) + sx * 0.3));
+        ctx.globalAlpha = twinkle;
+        ctx.fillStyle = "#eeddff";
+        ctx.fillRect(sx, sy, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+
+    // ── LAYER 4: Distant castle towers ─────
+    function drawTower(tx, ty, tw, th, windowRows) {
+        // Tower body
+        let tg = ctx.createLinearGradient(tx, ty, tx+tw, ty);
+        tg.addColorStop(0, "#0f0018");
+        tg.addColorStop(0.5, "#1a0028");
+        tg.addColorStop(1, "#0a0012");
+        ctx.fillStyle = tg;
+        ctx.fillRect(tx, ty, tw, th);
+        // Battlements (crenellations)
+        ctx.fillStyle = "#0f0018";
+        let mw = Math.floor(tw/8);
+        for(let i=0; i<4; i++) {
+            ctx.fillRect(tx + i*(mw*2), ty - 14, mw, 14);
+        }
+        // Glowing arched windows
+        for(let row=0; row<windowRows; row++) {
+            let wy = ty + 20 + row * 36;
+            let wx = tx + tw/2 - 7;
+            // Window glow aura
+            let wg = ctx.createRadialGradient(wx+7, wy+10, 1, wx+7, wy+10, 18);
+            let flicker = 0.6 + 0.4*Math.sin(bgTick*0.05 + tx*0.1 + row);
+            wg.addColorStop(0, `rgba(255,180,50,${0.35*flicker})`);
+            wg.addColorStop(1, "rgba(200,80,0,0)");
+            ctx.fillStyle = wg;
+            ctx.fillRect(wx-10, wy-8, 34, 36);
+            // Arched window shape
+            ctx.fillStyle = `rgba(255,160,30,${0.7*flicker})`;
+            ctx.fillRect(wx, wy+5, 14, 14);
+            ctx.beginPath();
+            ctx.arc(wx+7, wy+5, 7, Math.PI, 0);
+            ctx.fill();
+            // Inner dark
+            ctx.fillStyle = `rgba(60,20,0,${0.6})`;
+            ctx.fillRect(wx+2, wy+7, 10, 10);
+            ctx.beginPath();
+            ctx.arc(wx+7, wy+7, 5, Math.PI, 0);
+            ctx.fill();
+        }
+        // Edge brick detail
+        ctx.fillStyle = "#080010";
+        for(let gy=ty; gy<ty+th; gy+=14) {
+            ctx.fillRect(tx, gy, 2, 12);
+            ctx.fillRect(tx+tw-2, gy, 2, 12);
+        }
+    }
+
+    drawTower(30,  70,  60, 280, 3);
+    drawTower(130, 100, 44, 250, 2);
+    drawTower(626, 80,  60, 280, 3);
+    drawTower(720, 105, 44, 250, 2);
+
+    // ── LAYER 5: Castle main wall (mid) ────
+    // Main wall connecting towers
+    ctx.fillStyle = "#12001e";
+    ctx.fillRect(88, 130, 44, 220);   // left connector
+    ctx.fillRect(666, 130, 46, 220);  // right connector
+
+    // Large arched gateway (center-ish)
+    ctx.fillStyle = "#0d0018";
+    ctx.fillRect(310, 120, 180, 240);
+    // Gateway arch
+    ctx.fillStyle = "#0a0014";
+    ctx.fillRect(330, 180, 140, 180);
+    ctx.beginPath();
+    ctx.arc(400, 180, 70, Math.PI, 0);
+    ctx.fill();
+    // Gateway glow
+    let gateGlow = ctx.createRadialGradient(400, 200, 10, 400, 200, 80);
+    gateGlow.addColorStop(0, "rgba(180,0,80,0.18)");
+    gateGlow.addColorStop(1, "rgba(80,0,40,0)");
+    ctx.fillStyle = gateGlow;
+    ctx.fillRect(320, 120, 160, 260);
+    // Gate chains
+    ctx.strokeStyle = "#330022";
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(360, 180); ctx.lineTo(360, 360); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(440, 180); ctx.lineTo(440, 360); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── LAYER 6: Wall bricks (foreground) ──
+    drawBrickWall(ctx, 0, 180, W, H-180, "#17001f", "#1e0028");
+
+    // ── LAYER 7: Animated lava drips on wall
+    for(let d=0; d<6; d++) {
+        let dx = 80 + d * 120;
+        let phase = (bgTick * 0.8 + d * 40) % 260;
+        let dy = 200 + phase;
+        if(dy > H - 40) continue;
+        // Drip trail
+        let dg = ctx.createLinearGradient(dx, dy-30, dx, dy);
+        dg.addColorStop(0, "rgba(255,80,0,0)");
+        dg.addColorStop(1, "rgba(255,60,0,0.7)");
+        ctx.fillStyle = dg;
+        ctx.fillRect(dx-2, dy-30, 4, 32);
+        // Drip head blob
+        ctx.fillStyle = "#ff4400";
+        ctx.beginPath();
+        ctx.arc(dx, dy, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "#ffaa00";
+        ctx.beginPath();
+        ctx.arc(dx, dy-2, 2, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // ── LAYER 8: Torches ───────────────────
+    drawTorchGlow(ctx, 90, 200);
+    drawTorchGlow(ctx, 700, 200);
+    // Extra subtle ambient torches behind towers
+    let ta = 0.4 + 0.3*Math.sin(bgTick*0.04);
+    ctx.globalAlpha = ta;
+    drawTorchGlow(ctx, 310, 170);
+    drawTorchGlow(ctx, 490, 170);
+    ctx.globalAlpha = 1;
+
+    // ── LAYER 9: Ground floor stone ────────
+    let floor = ctx.createLinearGradient(0, H-60, 0, H);
+    floor.addColorStop(0, "#1e0030");
+    floor.addColorStop(1, "#0a000f");
+    ctx.fillStyle = floor;
+    ctx.fillRect(0, H-60, W, 60);
+    // Floor tile grid
+    ctx.strokeStyle = "#110018";
+    ctx.lineWidth = 1;
+    for(let fx=0; fx<W; fx+=40) {
+        ctx.beginPath(); ctx.moveTo(fx, H-60); ctx.lineTo(fx, H); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(0, H-30); ctx.lineTo(W, H-30); ctx.stroke();
+
+    // ── LAYER 10: Ambient red fog at bottom
+    let fog = ctx.createLinearGradient(0, H-80, 0, H);
+    fog.addColorStop(0, "rgba(100,0,20,0)");
+    fog.addColorStop(1, "rgba(180,10,30,0.30)");
+    ctx.fillStyle = fog;
+    ctx.fillRect(0, H-80, W, 80);
+
+    // ── Dither scanline overlay ─────────────
+    for(let sl=0; sl<H; sl+=3) {
+        ctx.fillStyle = "rgba(0,0,0,0.12)";
+        ctx.fillRect(0, sl, W, 1);
+    }
+}
+
+// ─────────────────────────────────────────────
+//  DRAW LOOP
+// ─────────────────────────────────────────────
+function draw(ctx, W, H) {
+    // ── LAYERED BACKGROUND ─────────────────
+    drawBackground(ctx, W, H);
+
+    // ── Lava ───────────────────────────────
+    let lx = level.lava.x;
+    let lavaW = level.goal.x - lx;
+    drawLavaPit(ctx, lx, H-40, lavaW, 40);
+    drawSpikes(ctx, lx, H-40, lavaW);
+
+    // ── Platforms ─────────────────────────
+    for(let p of level.platforms) {
+        // Stone platform base
+        let pg = ctx.createLinearGradient(p.x, p.y, p.x, p.y+p.h);
+        pg.addColorStop(0, "#554466");
+        pg.addColorStop(1, "#2a1a3a");
+        ctx.fillStyle = pg;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        // Top highlight
+        ctx.fillStyle = "#7755aa";
+        ctx.fillRect(p.x, p.y, p.w, 3);
+        // Brick lines
+        ctx.fillStyle = "#1a0025";
+        for(let bx=p.x; bx<p.x+p.w; bx+=20) {
+            ctx.fillRect(bx, p.y+3, 1, p.h-3);
+        }
+        ctx.fillRect(p.x, p.y+p.h/2, p.w, 1);
+    }
+
+    // ── Spike traps ────────────────────────
+    for(let t of level.traps) {
+        // Spike cluster
+        for(let i=0; i<t.w; i+=6) {
+            ctx.fillStyle = "#cc0000";
+            ctx.beginPath();
+            ctx.moveTo(t.x+i, t.y+t.h);
+            ctx.lineTo(t.x+i+3, t.y);
+            ctx.lineTo(t.x+i+6, t.y+t.h);
+            ctx.fill();
+            ctx.fillStyle = "#ff4444";
+            ctx.beginPath();
+            ctx.moveTo(t.x+i+2, t.y+t.h-3);
+            ctx.lineTo(t.x+i+3, t.y);
+            ctx.lineTo(t.x+i+4, t.y+t.h-3);
+            ctx.fill();
+        }
+    }
+
+    // ── Saw blades ─────────────────────────
+    for(let i=0; i<level.saws.length; i++) {
+        let s = level.saws[i];
+        drawRotatingSawBlade(ctx, s.x, s.y, s.r, sawPhase[i]||0);
+        // Mount bracket
+        ctx.fillStyle = "#555";
+        ctx.fillRect(s.x-4, s.y-4, 8, 8);
+    }
+
+    // ── Invisible block ────────────────────
+    if(level.invisBlock) {
+        let ib = level.invisBlock;
+        if(ib.visible) {
+            ctx.fillStyle = "rgba(255,255,255,0.08)";
+            ctx.fillRect(ib.x, ib.y, ib.w, ib.h);
+            ctx.strokeStyle = "rgba(255,255,255,0.2)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(ib.x, ib.y, ib.w, ib.h);
+        }
+    }
+
+    // ── Crushing ceiling ───────────────────
+    if(level.ceilCrush) {
+        let cc = level.ceilCrush;
+        let realY = ceilY;
+        ctx.fillStyle = "#2a0040";
+        ctx.fillRect(cc.x, realY, cc.w, cc.h);
+        ctx.fillStyle = "#550066";
+        ctx.fillRect(cc.x, realY+cc.h-4, cc.w, 4);
+        // Downward spikes on crusher
+        for(let sx=cc.x; sx<cc.x+cc.w; sx+=18) {
+            ctx.fillStyle = "#880099";
+            ctx.beginPath();
+            ctx.moveTo(sx, realY+cc.h);
+            ctx.lineTo(sx+9, realY+cc.h+20);
+            ctx.lineTo(sx+18, realY+cc.h);
+            ctx.fill();
+        }
+    }
+
+    // ── Death COUNTER PILLAR ───────────────
+    drawStonePillar(ctx, 350, 120, 100, 140);
+    ctx.fillStyle = "#110000";
+    ctx.fillRect(362, 148, 76, 46);
+    ctx.strokeStyle = "#550000";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(362, 148, 76, 46);
+    // LED display
+    ctx.font = "bold 14px 'Courier New'";
+    ctx.fillStyle = "#ff2200";
+    ctx.shadowColor = "#ff4400";
+    ctx.shadowBlur = 10;
+    ctx.fillText(`DEATHS:${deaths}`, 366, 167);
+    ctx.font = "11px 'Courier New'";
+    ctx.fillStyle = "#ff6633";
+    ctx.shadowBlur = 6;
+    ctx.fillText(`Attempt #${attempt}`, 370, 183);
+    ctx.shadowBlur = 0;
+
+    // ── GOAL FLAG ─────────────────────────
+    let g = level.goal;
+    ctx.fillStyle = "#225500";
+    ctx.fillRect(g.x+20, g.y-30, 4, 30);
+    ctx.fillStyle = "#00ff44";
+    ctx.beginPath();
+    ctx.moveTo(g.x+24, g.y-30);
+    ctx.lineTo(g.x+44, g.y-20);
+    ctx.lineTo(g.x+24, g.y-10);
+    ctx.fill();
+    ctx.fillStyle = "#003300";
+    ctx.fillRect(g.x, g.y, g.w, g.h);
+    ctx.strokeStyle = "#00ff44";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(g.x, g.y, g.w, g.h);
+    ctx.font = "bold 10px 'Courier New'";
+    ctx.fillStyle = "#00ff44";
+    ctx.fillText("EXIT", g.x+8, g.y+26);
+
+    // ── Player ────────────────────────────
+    if(player.dead) {
+        // Death flash
+        ctx.globalAlpha = (player.deathTimer % 10 < 5) ? 0.3 : 0.9;
+        // Skull
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 36px serif";
+        ctx.fillText("💀", player.x-4, player.y+30);
+        ctx.globalAlpha = 1;
+    } else {
+        drawKnight(ctx, player.x, player.y-8, player.facing);
+    }
+
+    // ── Scanline overlay ──────────────────
+    for(let y=0; y<H; y+=2) {
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.fillRect(0, y, W, 1);
+    }
+
+    // ── Controls inversion HUD ────────────
+    if(invertState.active) {
+        const cfg = INVERT_CONFIG[Math.min(currentLevel, INVERT_CONFIG.length-1)];
+        const dur = cfg[2];
+        const pct = invertState.timer / dur; // 1→0 as time runs out
+
+        // Flashing rate speeds up as it's about to end
+        const flashRate = invertState.timer < 120 ? 6 : 14;
+        const showText  = Math.floor(bgTick / flashRate) % 2 === 0;
+
+        if(showText) {
+            ctx.font = "bold 13px 'Courier New'";
+            ctx.fillStyle = invertState.timer < 120 ? "#ffff00" : "#ff3300";
+            ctx.shadowColor = invertState.timer < 120 ? "#ffcc00" : "#ff0000";
+            ctx.shadowBlur = 10;
+            ctx.fillText("⚠ CONTROLS INVERTED", 10, 20);
+            ctx.shadowBlur = 0;
+        }
+
+        // Timer bar — drains right to left under the warning text
+        const barW = 180;
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(10, 25, barW, 6);
+        // Bar color shifts from red → yellow as time runs out
+        let barR = 255, barG = Math.floor(pct > 0.3 ? 30 : (0.3-pct)/0.3*200);
+        ctx.fillStyle = `rgb(${barR},${barG},0)`;
+        ctx.fillRect(10, 25, Math.floor(barW * pct), 6);
+        ctx.strokeStyle = "#660000";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(10, 25, barW, 6);
+
+        // "REVERTING SOON" pulse when < 2s left
+        if(invertState.timer < 120 && showText) {
+            ctx.font = "bold 10px 'Courier New'";
+            ctx.fillStyle = "#ffff00";
+            ctx.fillText("← REVERTING SOON →", 10, 44);
+        }
+    }
+
+    // ── Level indicator (top-right) ────────
+    const lvlLabel = `LEVEL ${currentLevel + 1}`;
+    ctx.font = "bold 13px 'Courier New'";
+    // Shadow/outline for readability over background
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(W - 106, 6, 100, 20);
+    // Pixel border
+    ctx.strokeStyle = "#4400aa";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(W - 106, 6, 100, 20);
+    // Text glow
+    ctx.shadowColor = "#aa44ff";
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = "#cc88ff";
+    ctx.textAlign = "right";
+    ctx.fillText(lvlLabel, W - 10, 21);
+    ctx.textAlign = "left";
+    ctx.shadowBlur = 0;
+}
+
+// ─────────────────────────────────────────────
+//  HINT SYSTEM — per-level, ragebait hints
+// ─────────────────────────────────────────────
+const LEVEL_HINTS = [
+    // Level 1 hints
+    [
+        { text: "Just walk right and jump over the gap. It's literally one jump. You got this!", fine: "* Totally reliable advice from a friend." },
+        { text: "The red spiky thing on the platform? Decoration. Jump through it confidently.", fine: "* Our legal team confirms spikes are cosmetic." },
+        { text: "Pro tip: Run full speed across the middle platform without stopping. Speed = safety.", fine: "* This tip was verified by absolutely nobody." },
+        { text: "If you're still dying here, the issue is your keyboard. Not you. Definitely your keyboard.", fine: "* Please buy a new keyboard. It's not the game." },
+    ],
+    // Level 2 hints
+    [
+        { text: "The saw blade between platforms? It has a rhythm. Jump when it's at the TOP. Very simple.", fine: "* The saw does not have a rhythm. We lied." },
+        { text: "There's an invisible block somewhere. Our records show it does NOT exist on this level.", fine: "* (It absolutely exists. We put it there ourselves.)" },
+        { text: "Spikes on the platforms only hurt if you're moving. Try standing on them still first to get used to it.", fine: "* Spikes do not care about your velocity. Sorry." },
+        { text: "We've reviewed your gameplay footage. The problem is you're jumping too early. Jump later. Much later.", fine: "* We have not reviewed any footage. We don't watch. (We watch.)" },
+    ],
+    // Level 3 hints
+    [
+        { text: "The ceiling crusher has a 3-second safe window exactly after it hits the floor. Use it!", fine: "* The window is 0.4 seconds. The hint is off by 87.%" },
+        { text: "Both saw blades rotate in the SAME direction. Time your approach when they align on the left.", fine: "* One rotates clockwise, one counter-clockwise. Also there's a spike above you right now." },
+        { text: "Heads up: the invisible block on this level is positioned AFTER the third platform, NOT before it.", fine: "* It is before it. This hint exists to end you." },
+        { text: "Okay real talk, no trolling: just hug the left wall on each platform and you'll skip all traps safely.", fine: "* This is still trolling. The left wall has the traps." },
+    ],
+];
+
+// Death-count based bonus hints that override after many deaths
+const RAGE_HINTS = [
+    "Have you tried turning it off and on again?",
+    "New hint unlocked: touch grass. Seriously.",
+    "Our data shows 0% of players with your death count have ever won. Congrats on the data point.",
+    "HINT: The exit is the green box. You've seen it. You know where it is. So why are you still dying?",
+    "We've escalated your case to our Senior Hint Department. They said: git gud.",
+    "Hint acquired: the game is beatable. We've tested it once. In 2019. By the developer's cat.",
+];
+
+let currentHintIndex = 0;
+
+function showHint() {
+    currentHintIndex = 0;
+    renderHint();
+    document.getElementById("hint-overlay").classList.add("show");
+}
+
+function closeHint() {
+    document.getElementById("hint-overlay").classList.remove("show");
+}
+
+function nextHint() {
+    currentHintIndex++;
+    renderHint();
+}
+
+function renderHint() {
+    const hints = LEVEL_HINTS[currentLevel] || LEVEL_HINTS[0];
+    // After enough deaths, inject rage hints
+    if(deaths >= 8 && currentHintIndex >= hints.length) {
+        let ri = (currentHintIndex - hints.length) % RAGE_HINTS.length;
+        document.getElementById("hint-text").innerText = RAGE_HINTS[ri];
+        document.getElementById("hint-fine-print").innerText = "* You unlocked DESPERATION HINTS. Lucky you.";
+    } else {
+        let idx = currentHintIndex % hints.length;
+        let h = hints[idx];
+        document.getElementById("hint-text").innerText = h.text;
+        document.getElementById("hint-fine-print").innerText = h.fine;
+    }
+    let total = deaths >= 8 ? hints.length + RAGE_HINTS.length : hints.length;
+    document.getElementById("hint-lvl-num").innerText = currentLevel + 1;
+    document.getElementById("hint-num").innerText = (currentHintIndex % (LEVEL_HINTS[currentLevel].length)) + 1;
+    document.getElementById("hint-total").innerText = LEVEL_HINTS[currentLevel].length;
+}
+
+// ─────────────────────────────────────────────
+//  TRANSITION ENGINE
+// ─────────────────────────────────────────────
+const LEVEL_SUBTITLES = [
+    "Good luck. You'll need it.",
+    "Wait, it gets harder? Yes.",
+    "This is fine. Everything is fine.",
+];
+
+let transitionActive = false;
+
+// Easing helpers
+function easeOutExpo(t) { return t === 1 ? 1 : 1 - Math.pow(2, -10 * t); }
+function easeInExpo(t)  { return t === 0 ? 0 : Math.pow(2, 10 * t - 10); }
+
+function playTransition(levelIndex, onComplete) {
+    if(transitionActive) return;
+    transitionActive = true;
+
+    const ov   = document.getElementById("transition-overlay");
+    const bg   = document.getElementById("trans-bg");
+    const titl = document.getElementById("trans-title");
+    const sub  = document.getElementById("trans-sub");
+    const lbl  = document.getElementById("trans-label");
+    const lt   = document.getElementById("trans-line-top");
+    const lb   = document.getElementById("trans-line-bot");
+
+    // Set content
+    titl.innerText = `LEVEL ${levelIndex + 1}`;
+    sub.innerText  = LEVEL_SUBTITLES[levelIndex] || "...brace yourself.";
+    lbl.innerText  = "— NOW ENTERING —";
+
+    // Reset state
+    ov.style.pointerEvents = "all";
+    bg.style.opacity   = "0";
+    titl.style.transform  = "scaleX(0)";
+    titl.style.opacity    = "1";
+    sub.style.opacity     = "0";
+    lt.style.opacity = lb.style.opacity = "0";
+    lt.style.width = lb.style.width = "0%";
+    lt.style.left  = lb.style.left  = "50%";
+
+    const DUR = 1800; // total ms for in+hold+out
+    const start = performance.now();
+
+    function tick(now) {
+        const elapsed = now - start;
+        const t = Math.min(elapsed / DUR, 1);
+
+        // ── PHASE 1 (0–0.3): fade in bg + stamp title ──
+        if(t < 0.30) {
+            let p = t / 0.30;
+            ov.style.opacity     = String(easeOutExpo(p));
+            bg.style.opacity     = String(easeOutExpo(p));
+            titl.style.transform = `scaleX(${easeOutExpo(Math.min(p * 3, 1))})`;
+
+            // Horizontal lines shoot out from center
+            let lw = easeOutExpo(p) * 50;
+            lt.style.opacity = lb.style.opacity = String(easeOutExpo(p));
+            lt.style.width   = lb.style.width   = lw + "%";
+            lt.style.left    = lb.style.left    = (50 - lw/2) + "%";
+        }
+
+        // ── PHASE 2 (0.3–0.6): hold, sub fades in ──
+        else if(t < 0.60) {
+            ov.style.opacity     = "1";
+            bg.style.opacity     = "1";
+            titl.style.transform = "scaleX(1)";
+            lt.style.width = lb.style.width = "50%";
+            lt.style.left  = lb.style.left  = "25%";
+            let p2 = (t - 0.30) / 0.30;
+            sub.style.opacity = String(easeOutExpo(p2));
+            // Slight red screen shake on title
+            let shake = Math.sin(p2 * 40) * 3 * (1 - p2);
+            titl.style.marginLeft = shake + "px";
+        }
+
+        // ── PHASE 3 (0.6–1.0): wipe out ──
+        else {
+            let p3 = (t - 0.60) / 0.40;
+            ov.style.opacity      = String(1 - easeInExpo(p3));
+            titl.style.transform  = `scaleX(${1 - easeInExpo(Math.min(p3 * 1.5, 1))})`;
+            sub.style.opacity     = String(Math.max(0, 1 - p3 * 3));
+            titl.style.marginLeft = "0px";
+        }
+
+        if(t < 1) {
+            requestAnimationFrame(tick);
+        } else {
+            // Done — reset and hand back control
+            ov.style.opacity       = "0";
+            ov.style.pointerEvents = "none";
+            titl.style.transform   = "scaleX(0)";
+            transitionActive = false;
+            if(onComplete) onComplete();
+        }
+    }
+
+    requestAnimationFrame(tick);
+}
+
+// Title → game: red flash wipe then transition
+function playStartAnimation(onComplete) {
+    const ts = document.getElementById("title-screen");
+    const gs = document.getElementById("game-screen");
+
+    // Flash the title screen red, then swap
+    const ov  = document.getElementById("transition-overlay");
+    const bg  = document.getElementById("trans-bg");
+    const titl = document.getElementById("trans-title");
+    const sub  = document.getElementById("trans-sub");
+    const lbl  = document.getElementById("trans-label");
+    const lt   = document.getElementById("trans-line-top");
+    const lb   = document.getElementById("trans-line-bot");
+
+    // Configure for start
+    lbl.innerText  = "— PREPARE TO DIE —";
+    titl.innerText = "LEVEL 1";
+    titl.style.transform = "scaleX(0)";
+    titl.style.opacity   = "1";
+    sub.innerText  = LEVEL_SUBTITLES[0];
+    sub.style.opacity = "0";
+    lt.style.opacity = lb.style.opacity = "0";
+    lt.style.width = lb.style.width = "0%";
+    lt.style.left  = lb.style.left  = "50%";
+    bg.style.background = "#110000";
+    ov.style.pointerEvents = "all";
+
+    const start = performance.now();
+    const DUR = 2000;
+    let swapped = false;
+
+    function tick(now) {
+        const t = Math.min((now - start) / DUR, 1);
+
+        if(t < 0.20) {
+            // Fade in crimson overlay over title
+            ov.style.opacity = String(easeOutExpo(t / 0.20));
+        }
+        else if(t < 0.25) {
+            if(!swapped) {
+                ts.style.display = "none";
+                gs.classList.add("active");
+                resizeCanvas();
+                swapped = true;
+            }
+            ov.style.opacity = "1";
+        }
+        else if(t < 0.55) {
+            let p = (t - 0.25) / 0.30;
+            titl.style.transform = `scaleX(${easeOutExpo(p)})`;
+            let lw = easeOutExpo(p) * 50;
+            lt.style.opacity = lb.style.opacity = String(easeOutExpo(p));
+            lt.style.width   = lb.style.width   = lw + "%";
+            lt.style.left    = lb.style.left    = (50 - lw/2) + "%";
+            sub.style.opacity = String(easeOutExpo(Math.min(p * 1.5, 1)));
+        }
+        else if(t < 0.75) {
+            // Hold
+            titl.style.transform = "scaleX(1)";
+            let shake = Math.sin((t-0.55)*120) * 2 * (1 - (t-0.55)/0.20);
+            titl.style.marginLeft = shake + "px";
+        }
+        else {
+            let p3 = (t - 0.75) / 0.25;
+            ov.style.opacity     = String(1 - easeInExpo(p3));
+            titl.style.transform = `scaleX(${1 - easeInExpo(Math.min(p3*2, 1))})`;
+            sub.style.opacity    = String(Math.max(0, 1 - p3*4));
+            titl.style.marginLeft = "0px";
+        }
+
+        if(t < 1) {
+            requestAnimationFrame(tick);
+        } else {
+            ov.style.opacity       = "0";
+            ov.style.pointerEvents = "none";
+            bg.style.background    = "#000";
+            if(onComplete) onComplete();
+        }
+    }
+    requestAnimationFrame(tick);
+}
+
+// ─────────────────────────────────────────────
+//  CANVAS RESIZE — fills available space
+// ─────────────────────────────────────────────
+// Logical game resolution (aspect ratio locked)
+const GAME_W = 960, GAME_H = 480;
+
+function resizeCanvas() {
+    const wrap = document.getElementById("canvas-wrap");
+    if(!wrap) return;
+    const aw = wrap.clientWidth;
+    const ah = wrap.clientHeight;
+    const scale = Math.min(aw / GAME_W, ah / GAME_H);
+    const cw = Math.floor(GAME_W * scale);
+    const ch = Math.floor(GAME_H * scale);
+    const gc = document.getElementById("gameCanvas");
+    gc.width  = GAME_W;
+    gc.height = GAME_H;
+    gc.style.width  = cw + "px";
+    gc.style.height = ch + "px";
+    gc.style.boxShadow = "0 0 40px #ff000055, 0 0 80px #330011aa";
+}
+window.addEventListener("resize", resizeCanvas);
+
+// ─────────────────────────────────────────────
+//  START / INIT
+// ─────────────────────────────────────────────
+function startGame() {
+    document.getElementById("title-screen").style.display = "none";
+    document.getElementById("game-screen").classList.add("active");
+    resizeCanvas();
+    loadLevel(0);
+    resetPlayer();
+    update();
+    playStartAnimation(() => {});
+}
+
+// ─────────────────────────────────────────────
+//  END SCREEN
+// ─────────────────────────────────────────────
+let endParticles = [];
+
+function getRating(d) {
+    if(d === 0)  return "IMPOSSIBLE (CHEATER?)";
+    if(d <= 5)   return "LEGENDARY";
+    if(d <= 15)  return "VERY GOOD";
+    if(d <= 30)  return "AVERAGE";
+    if(d <= 60)  return "BELOW AVERAGE";
+    if(d <= 100) return "JUST AWFUL";
+    return "CERTIFIED MASOCHIST";
+}
+
+function showEndScreen() {
+    // Populate stats
+    document.getElementById("end-stat-deaths").innerText   = deaths;
+    document.getElementById("end-stat-attempts").innerText = attempt;
+    document.getElementById("end-rating").innerText        = getRating(deaths);
+
+    // Tweak message based on death count
+    const msgs = [
+        ["You died 0 times.", "Either you're a god, or you cheated.",  "We're going with cheated."],
+        ["Impressive. Genuinely.",  "We didn't think anyone would get this far.",  "We're slightly embarrassed."],
+        ["You did it the hard way.", "Every death was a lesson.", "Most lessons were 'don't do that again'."],
+        ["That was painful to watch.", "And yet here we are.", "You absolute legend."],
+        ["We've seen veterans rage-quit this game.", "You just... kept going.", "Respect. Barely."],
+    ];
+    const mi = deaths === 0 ? 0 : deaths <= 10 ? 1 : deaths <= 30 ? 2 : deaths <= 70 ? 3 : 4;
+    const [l1, l2, l3] = msgs[mi];
+    document.getElementById("end-msg").innerHTML =
+        `${l1}<br>${l2}<br>${l3}<br><br>` +
+        `Thank you for playing <strong style="color:#ff3333">DEATH COUNTER</strong>.`;
+
+    // Spawn particles for the canvas bg
+    const ec = document.getElementById("end-canvas");
+    ec.width  = window.innerWidth;
+    ec.height = window.innerHeight;
+    endParticles = [];
+    const cols = ["#ff3333","#ff6600","#ffcc00","#cc44ff","#00eeff","#ff2299"];
+    for(let i=0; i<80; i++) {
+        endParticles.push({
+            x: Math.random() * ec.width,
+            y: Math.random() * ec.height,
+            vx: (Math.random()-0.5)*1.2,
+            vy: -Math.random()*1.5 - 0.5,
+            size: 4 + Math.floor(Math.random()*6),
+            col: cols[Math.floor(Math.random()*cols.length)],
+            alpha: 0.6 + Math.random()*0.4,
+        });
+    }
+
+    document.getElementById("end-screen").classList.add("show");
+    animateEndScreen();
+}
+
+function animateEndScreen() {
+    if(!document.getElementById("end-screen").classList.contains("show")) return;
+    const ec = document.getElementById("end-canvas");
+    const ex = ec.getContext("2d");
+    ex.clearRect(0, 0, ec.width, ec.height);
+
+    for(let p of endParticles) {
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.02; // gentle gravity
+        // Wrap around
+        if(p.y > ec.height + 10) { p.y = -10; p.x = Math.random()*ec.width; }
+        if(p.x < -10) p.x = ec.width + 10;
+        if(p.x > ec.width + 10) p.x = -10;
+
+        ex.globalAlpha = p.alpha * (0.7 + 0.3*Math.sin(Date.now()*0.003 + p.x));
+        ex.fillStyle = p.col;
+        // Pixel-square confetti
+        ex.fillRect(Math.floor(p.x), Math.floor(p.y), p.size, p.size);
+    }
+    ex.globalAlpha = 1;
+    requestAnimationFrame(animateEndScreen);
+}
+
+function replayGame() {
+    deaths = 0; attempt = 1; currentLevel = 0;
+    document.getElementById("deaths").innerText   = 0;
+    document.getElementById("led-deaths").innerText = 0;
+    document.getElementById("led-attempt").innerText  = 1;
+    document.getElementById("led-attempt2").innerText = 1;
+    document.getElementById("end-screen").classList.remove("show");
+    loadLevel(0);
+    resetPlayer();
+    document.getElementById("troll-msg").innerText = "Back for more? Pathetic. Let's go.";
+}
+
+function goToTitle() {
+    deaths = 0; attempt = 1; currentLevel = 0;
+    document.getElementById("end-screen").classList.remove("show");
+    document.getElementById("game-screen").classList.remove("active");
+    document.getElementById("title-screen").style.display = "flex";
+    animateTitle();
+}
+
+// ── Title screen setup ────────────────────────
+drawTitleScreen();
+
+let titleSawAngle = 0;
+function animateTitle() {
+    if(!document.getElementById("title-screen") ||
+       document.getElementById("title-screen").style.display === "none") return;
+    drawTitleScreen();
+    titleSawAngle += 0.03;
+    const tx = document.getElementById("titleCanvas").getContext("2d");
+    drawRotatingSawBlade(tx, 60,  190, 34, titleSawAngle);
+    drawRotatingSawBlade(tx, 720, 190, 34, -titleSawAngle*1.3);
+    drawRotatingSawBlade(tx, 380, 44,  26, titleSawAngle*0.8);
+    requestAnimationFrame(animateTitle);
+}
+animateTitle();
+
+</script>
+</body>
+</html>
